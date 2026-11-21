@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang='zh-CN'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>钛螺丝智能体矩阵</title>
+<style>
+:root{--ink:#12181f;--ink2:#5a6a7a;--line:#e2e8ee;--bg:#f5f7fa;--card:#fff;--accent:#1f6feb}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 'PingFang SC','Microsoft YaHei',system-ui,sans-serif}
+header{background:linear-gradient(135deg,#0d2233,#16405e);color:#fff;padding:20px 22px 16px}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand h1{font-size:20px;margin:0}
+.brand span{font-size:13px;color:#9fc0d8}
+.badge{margin-left:auto;font-size:12px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2)}
+.route{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;font-size:12.5px;color:#b9d2e4}
+.node{padding:3px 10px;border-radius:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);transition:.2s}
+.node.on{background:#fff;color:#0d2233;font-weight:600}
+main{max-width:860px;margin:0 auto;padding:20px 16px 130px}
+.hint{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:18px;font-size:13.5px;color:var(--ink2)}
+.hint b{color:var(--ink)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.chip{font-size:12.5px;padding:5px 11px;border-radius:16px;cursor:pointer;background:#eef3f9;border:1px solid #dbe6f2;color:#1a4c7d}
+.chip:hover{background:#e0ebf7}
+.msg{display:flex;gap:10px;margin-bottom:18px;align-items:flex-start}
+.msg.user{flex-direction:row-reverse}
+.avatar{flex:none;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff}
+.bubble{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 15px;max-width:min(680px,88%)}
+.msg.user .bubble{background:#eaf2ff;border-color:#cfe0f8}
+.who{font-size:12.5px;font-weight:700;margin-bottom:4px;display:flex;gap:8px;align-items:center}
+.who small{font-weight:400;color:var(--ink2);font-size:11.5px}
+.bubble p{margin:0 0 8px}
+.bubble p:last-child{margin-bottom:0}
+.bubble strong{color:#0b3f7a}
+.srcs{margin-top:10px;padding-top:9px;border-top:1px dashed var(--line);display:flex;gap:6px;flex-wrap:wrap}
+.src{font-size:11.5px;color:#2f6b5a;background:#e8f6ef;border:1px solid #cfeadd;padding:2px 8px;border-radius:5px}
+footer{position:fixed;left:0;right:0;bottom:0;background:rgba(245,247,250,.94);border-top:1px solid var(--line);padding:12px 16px}
+.inputbar{max-width:860px;margin:0 auto;display:flex;gap:10px}
+input[type=text]{flex:1;padding:13px 15px;border:1px solid #cfdae6;border-radius:11px;font-size:15px;font-family:inherit;outline:none}
+input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,111,235,.12)}
+button{padding:0 22px;border:none;border-radius:11px;background:var(--accent);color:#fff;font-size:15px;font-family:inherit;cursor:pointer}
+button:hover{background:#0b4ea2}
+.typing{color:var(--ink2);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+<div class='brand'>
+<h1>钛螺丝智能体矩阵</h1>
+<span>四人分工 · 每条结论可追溯出处</span>
+<span class='badge'>知识库检索模式</span>
+</div>
+<div class='route'>
+<span>需求 →</span>
+<span class='node' data-k='boss'>Boss 总调度</span>
+<span>→</span>
+<span class='node' data-k='lead'>线索Bot</span>
+<span class='node' data-k='solution'>方案Bot</span>
+<span class='node' data-k='comm'>沟通Bot</span>
+<span>→ 汇总</span>
+</div>
+</header>
+<main>
+<div class='hint'>
+<b>试试这些：</b>下面每条都跑过真实验证。矩阵先判断该谁答，再按各自口径作答；涉及价格的只说「需核价」，涉及工艺参数的只说「需工艺确认」。
+<div class='chips' id='chips'></div>
+</div>
+<div id='chat'></div>
+</main>
+<footer>
+<div class='inputbar'>
+<input id='q' type='text' placeholder='问点什么：找客户、选型报价、怎么回客户……' autocomplete='off'>
+<button id='send'>发送</button>
+</div>
+</footer>
+<script>
+var COLORS={boss:'#1f6feb',lead:'#0f9d76',solution:'#c2681a',comm:'#7b52c9'};
+var NAMES={boss:['Boss','总调度'],lead:['线索Bot','拓客'],solution:['方案Bot','选型报价'],comm:['沟通Bot','沟通']};
+var RULES=[
+['lead',['找客户','线索','哪家有','拓客','名单','商机','客户清单','开发客户']],
+['comm',['怎么回','话术','客户说','跟进','拒绝','嫌贵','太贵','回复客户','怎么谈','异议','邮件','写封','写一封','附上','开口']],
+['solution',['能不能做','多少钱','报价','价格','选哪个','用什么','规格','数量','材质','抗拉','强度','扭矩','M3','M4','M5','M6','M8','M10','M12','TC4','TA2','阳极','表面处理']]
+];
+var CASES=[
+{kw:['M8','卡钳'],agent:'solution',head:'这个能做，方案和风险都在这儿，价格要工厂核。',lines:[
+'**需求确认**：M8×30 / TC4（Ti-6Al-4V）/ 内六角圆柱头 / 蓝色阳极氧化 / 2000 件 / 摩托车刹车卡钳。⚠️ 卡钳本体材质、现场拧紧扭矩待确认。',
+'**推荐方案**：TC4 M8×30 粗牙 + 蓝色阳极氧化 + 装配涂 MoS₂ 防咬合剂。TC4 抗拉强度 ≥895 MPa、屈服强度 ≥828 MPa，同规格比钢轻约 43%。',
+'**参考价**：本款不出单价。市场口径「钛螺丝单价几元到二三十元不等」是全品类参考区间，不是这一款的价格。',
+'⚠️ 参考价，非正式报价，以工厂核价为准。',
+'**风险提示**：①刹车卡钳属安全件，以贵司工程验证与装机测试为准；②钛与钛或不锈钢接触易冷焊咬死，装配必须涂 MoS₂；③钛的扭矩系数 K 约 0.16～0.22（干态），不能按钢拧——按算例 K=0.19 时约 32 N·m，按钢的 45 N·m 拧有咬死与断裂风险；④卡钳本体若是铝合金，需加绝缘垫防电偶腐蚀。',
+'**需要你确认**：①卡钳本体材质 ②现场拧紧扭矩 ③是否配 MoS₂ 防咬合剂。'],srcs:['知识库 §一','知识库 §四','知识库 §五','知识库 §六']},
+{kw:['抗拉'],agent:'solution',head:'看牌号，不是一个数。',lines:[
+'TA2（工业纯钛，通用与耐蚀）：抗拉强度 ≥440 MPa，屈服 ≥275 MPa。',
+'TC4（Ti-6Al-4V，高强度与承力件）：抗拉强度 ≥895 MPa，屈服 ≥828 MPa。',
+'TC4 ELI（医疗级）：抗拉强度 ≥860 MPa，屈服 ≥795 MPa。',
+'参考：8.8 级钢 800 MPa、10.9 级钢 1040 MPa、A2-70 不锈钢 700 MPa。',
+'装饰件或耐蚀场景走 TA2，承力件走 TC4。**需要你确认**：用途是装饰还是承力。'],srcs:['知识库 §一']},
+{kw:['嫌贵'],agent:'comm',head:'不降价，把账算到客户那边去。',lines:[
+'**微信版**：理解，钛螺丝单价确实比钢的高，这个不瞒您。贵在三处：钛材本身贵，加工慢、工时高，还多一道阳极氧化。不过它省的钱不在单价上——颜色是阳极氧化长出来的膜，不是喷漆，可以按规格和用途做颜色区分，新人看颜色就知道装哪，不用老师傅盯着。想问您一句，你们车间这一年因为装错返工、生锈换货大概花过多少？',
+'**邮件版**：标题「关于钛螺丝价格，算一笔综合成本账」，把防错装、减重、防腐三条分开写，结尾请对方提供常用规格与安装部位，我们做一份对比测算。',
+'**电话版（30 秒开口）**：「×总，价格我这边不能随口改。您报两三个常用规格，我请工厂核价后回复您。账期我们也不在这里口头定，按公司统一政策来。」',
+'**三个可能的问题**：①能不能便宜点 → 报规格数量，核价后回复，不口头让价；②我现在用的钢也能用 → 问三句：装错过吗、生锈换过货吗、新人要带多久；③能管多少年不锈 → 具体年限要看本厂实测数据，请工程书面回复，不打包票。'],srcs:['知识库 §一','知识库 §2.1','知识库 §九','知识库 §八']},
+{kw:['邮件'],agent:'comm',head:'模板给你，编号的地方我不替你填。',lines:[
+'**标题**：关于【客户名称】钛螺丝选型与样品的说明',
+'**正文**：×总您好。按上次沟通，把【规格/数量/用途】的情况汇总如下。材质与表面处理方案见附件《需求确认表》，其中标注「需核价」「需工艺确认」的部分，工厂回复后我第一时间补给您。',
+'**关于价格**：附件中的价格为参考价，非正式报价，以工厂核价为准。',
+'**下一步**：确认规格与数量后，我们安排样品；装机验证结果以贵司实测为准。',
+'**需要你确认**：①附哪一份方案（选型表 / 报价单 / 样品说明）②收件人称呼 ③要不要抄送工厂。'],srcs:['知识库 §八']},
+{kw:['不锈钢'],agent:'solution',head:'这个超出我们的产品范围，我不硬答。',lines:[
+'我们做的是钛及钛合金紧固件（TA2 / TC4），不锈钢内六角不在产品线里，相关强度、价格、交期我这边没有可靠数据，不编给你。',
+'**如果你其实想要轻量化或防错装**：同规格换成 TC4 钛螺栓，重量约省 43%，颜色可按阳极氧化做区分。告诉我规格和用途，我按钛方案走一遍。'],srcs:['知识库 §一','知识库 §2.1']},
+{kw:['哪家公司'],agent:'boss',head:'公司名不编。',lines:[
+'这类信息我不能张口就来——本 Bot 不生成公司名称、地址、联系人、电话。',
+'**需要人工提供**：正式公司信息请由业务对接人给，我不代填。'],srcs:['知识库 §八']},
+{kw:['防腐'],agent:'boss',head:'年限这个数，工艺给不了就不填。',lines:[
+'知识库对**具体防腐年限**标红，属于需工艺与实际工况确认项，我不补数。',
+'能说的是机理：钛表面自然生成致密氧化膜，破坏后还能自修复，在海水与氯化物环境中表现明显优于普通钢件。',
+'**要具体年限**：请提供介质、浓度、温度、是否长期浸没，由工艺出实验室数据，我才能转述。'],srcs:['知识库 §二','知识库 §九']},
+{kw:['永不生锈'],agent:'boss',head:'这个我不能承诺。',lines:[
+'「永不生锈」是绝对化表述，任何厂商给不了，我们也不给。',
+'能说的是机理：钛表面自然生成致密氧化膜，破坏后还能自修复，所以耐蚀性好；但具体年限受介质、浓度、温度、装配方式影响，要工艺按工况给数据。',
+'**建议**：把使用环境告诉我，我按工况给你对应的数据和案例。'],srcs:['知识库 §2.1','知识库 §八']},
+{kw:['颜色会掉'],agent:'boss',head:'不会像喷漆那样掉。',lines:[
+'颜色是阳极氧化时膜厚产生的干涉色，不是喷涂上去的颜料层——它长在金属表面里，不会整片脱落。',
+'但要说清楚：颜色可能因膜厚波动有轻微色差，深色件长期强光下会缓慢变化，这是物理现象不是质量缺陷。',
+'**需要你确认**：用在室内还是户外、是否长期强光暴露。'],srcs:['知识库 §2.1']},
+{kw:['电压'],agent:'boss',head:'蓝色对应的电压，本厂要查工艺卡。',lines:[
+'颜色由阳极氧化电压决定，不同电压出不同颜色的干涉色。',
+'知识库里的 18～25 V 是**参考区间**，只能内部参考，不能当本厂工艺参数对客户报出去。',
+'**需要确认**：本厂蓝色对应电压，需工艺确认。'],srcs:['知识库 §2.2']},
+{kw:['多少钱'],agent:'solution',head:'这个信息还不够，我先问一句再往下走。',lines:[
+'需要两个信息：规格（比如 M6×20、M8×30）和用途场景（刹车、悬挂、装饰，还是机箱结构件）。',
+'另外请给数量。这三样齐了，我出选型建议和参考价区间，价格以工厂核价为准。'],srcs:['知识库 §五']},
+{kw:['线索'],agent:'lead',head:'这轮没联网，给不了真实线索。',lines:[
+'空口编公司名和电话是不行的，所以这条只给可执行的检索方案。',
+'**关键词组**：摩托车改装厂 → 改装件 厂家 / 改装套件 批发；汽车改装厂 → 改装中心 连锁；改装套件商 → 刹车卡钳 改装 厂家；五金批发 → 紧固件 批发 钛螺丝。',
+'**平台**：1688、慧聪、中国供应商、重庆摩博会与上海改装展名录、企查查按行业筛；海外 Alibaba、Made-in-China、ThomasNet。',
+'**需要你确认**：目标客户类型和区域，我按这个出结构化线索表。'],srcs:['检索策略（本次未联网，无真实线索）']}
+];
+function route(q){for(var i=0;i<RULES.length;i++){var ks=RULES[i][1];for(var j=0;j<ks.length;j++){if(q.indexOf(ks[j])>=0)return RULES[i][0];}}return 'boss';}
+function pick(q){for(var i=0;i<CASES.length;i++){var ok=true,ks=CASES[i].kw;for(var j=0;j<ks.length;j++){if(q.indexOf(ks[j])<0){ok=false;break;}}if(ok)return CASES[i];}return null;}
+var FALLBACK={agent:'boss',head:'这条我不敢直接答。',lines:['知识库里没有对应条目，我不猜也不编数字。','**建议**：把具体规格、用途、或客户原话补充给我，我判断该派给线索Bot、方案Bot 还是沟通Bot；属实拿不准的，转人工。'],srcs:['知识库（未命中）']};
+var chat=document.getElementById('chat'),input=document.getElementById('q'),btn=document.getElementById('send');
+var PRESETS=['M8×30 TC4 内六角，蓝色阳极氧化，2000 件，摩托车刹车卡钳，报个价','钛螺丝颜色会掉吗','你们能保证永不生锈吗','客户嫌贵，怎么回','蓝色对应什么电压','帮我找一批重庆的摩托车改装厂线索'];
+PRESETS.forEach(function(t){var c=document.createElement('span');c.className='chip';c.textContent=t;c.onclick=function(){input.value=t;ask();};document.getElementById('chips').appendChild(c);});
+function esc(s){return s.replace(/</g,'&lt;');}
+function addMsg(who,role,color,html,srcs){var w=document.createElement('div');w.className='msg'+(who==='你'?' user':'');var a=document.createElement('div');a.className='avatar';a.style.background=color;a.textContent=who==='你'?'你':who.replace('Bot','').slice(0,2);var b=document.createElement('div');b.className='bubble';b.innerHTML='<div class=who>'+who+'<small>'+role+'</small></div>'+html;if(srcs&&srcs.length){var s=document.createElement('div');s.className='srcs';srcs.forEach(function(x){var e=document.createElement('span');e.className='src';e.textContent='依据 · '+x;s.appendChild(e);});b.appendChild(s);}w.appendChild(a);w.appendChild(b);chat.appendChild(w);window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});}
+function setRoute(k){var ns=document.querySelectorAll('.node');for(var i=0;i<ns.length;i++){ns[i].className='node'+(ns[i].getAttribute('data-k')===k?' on':'');}}
+function ask(){var q=input.value.trim();if(!q)return;addMsg('你','','#68757f','<p>'+esc(q)+'</p>');input.value='';var t=document.createElement('div');t.className='msg';t.innerHTML='<div class=avatar style=background:#c3ccd6>…</div><div class=bubble><div class=typing>判断该谁处理…</div></div>';chat.appendChild(t);setTimeout(function(){var d=pick(q)||FALLBACK;var ag=route(q);var name=NAMES[ag]||NAMES.boss;t.remove();setRoute(ag);var html=d.head?'<p><strong>'+d.head+'</strong></p>':'';html+=d.lines.map(function(l){return esc(l).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').split('\n').map(function(p){return '<p>'+p+'</p>';}).join('');}).join('');addMsg(name[0],name[1],COLORS[ag]||'#1f6feb',html,d.srcs);input.focus();},260);}
+btn.onclick=ask;input.addEventListener('keydown',function(e){if(e.key==='Enter')ask();});
+addMsg('Boss','总调度',COLORS.boss,'<p>我是这套矩阵的总调度。需求进来我先判断该谁处理：</p><p>· 要客户名单 → 线索Bot<br>· 给规格问能不能做、多少钱 → 方案Bot<br>· 要回客户的话 → 沟通Bot<br>· 只问原理 → 我自己用知识库答</p><p>定下规矩：<strong>不编数字、不编公司名、不做绝对承诺。</strong>知识库里标红的条目，一律答「需工艺/财务确认」。</p>',['知识库 §八 合规红线']);
+</script>
+</body>
+</html>
