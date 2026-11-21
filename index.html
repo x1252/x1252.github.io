@@ -109,7 +109,7 @@ var CASES=[
 {kw:['不锈钢'],agent:'solution',head:'这个超出我们的产品范围，我不硬答。',lines:[
 '我们做的是钛及钛合金紧固件（TA2 / TC4），不锈钢内六角不在产品线里，相关强度、价格、交期我这边没有可靠数据，不编给你。',
 '**如果你其实想要轻量化或防错装**：同规格换成 TC4 钛螺栓，重量约省 43%，颜色可按阳极氧化做区分。告诉我规格和用途，我按钛方案走一遍。'],srcs:['知识库 §一','知识库 §2.1']},
-{kw:['哪家公司'],agent:'boss',head:'公司名不编。',lines:[
+{kw:['哪个公司','哪家公司','公司名'],agent:'boss',head:'公司名不编。',lines:[
 '这类信息我不能张口就来——本 Bot 不生成公司名称、地址、联系人、电话。',
 '**需要人工提供**：正式公司信息请由业务对接人给，我不代填。'],srcs:['知识库 §八']},
 {kw:['防腐'],agent:'boss',head:'年限这个数，工艺给不了就不填。',lines:[
@@ -141,7 +141,19 @@ var SECTIONS=[];
 function splitSections(t){var out=[],title=null,buf=[];t.split(/\r?\n/).forEach(function(line){if(line.indexOf('## ')===0){if(title)out.push([title,buf.join('\n').trim()]);title=line.slice(3).trim();buf=[];}else if(title!==null){buf.push(line);}});if(title)out.push([title,buf.join('\n').trim()]);return out;}
 function score(text,q){var words=q.split(/[\s，。、；：？！,.;:?!()（）「」【】]+/).filter(function(w){return w.length>=2;});var grams={};words.forEach(function(w){for(var i=0;i<w.length-1;i++)grams[w.slice(i,i+2)]=1;});var s=0;words.forEach(function(w){if(text.indexOf(w)>=0)s+=6;});for(var g in grams){if(text.indexOf(g)>=0)s+=1;}return s;}
 function retrieve(q,k){k=k||2;var scored=SECTIONS.map(function(p){return [p[0],p[1],score(p[0]+'\n'+p[1],q)];}).filter(function(x){return x[2]>0;});scored.sort(function(a,b){return b[2]-a[2];});return scored.slice(0,k).map(function(x){return [x[0],x[1]];});}
-function excerpt(body,q){var chunks=body.split(/\n(?=[|\-\d#])/).map(function(c){return c.trim();}).filter(Boolean);if(!chunks.length)return body.slice(0,320);var best=chunks[0],bs=-1;chunks.forEach(function(c){var s=score(c,q);if(s>bs){bs=s;best=c;}});return best.slice(0,320);}
+function excerpt(body,q){
+  var paras=body.split(/\n\s*\n/).map(function(c){return c.trim();}).filter(Boolean);
+  if(!paras.length)return body.slice(0,400);
+  var best=paras[0],bs=-1;
+  paras.forEach(function(p){var s=score(p,q);if(s>bs){bs=s;best=p;}});
+  if(best.charAt(0)==='|'){
+    var rows=best.split('\n').filter(function(r){return r.trim().charAt(0)==='|';});
+    var b=rows[0],bss=-1;
+    rows.forEach(function(r){var s=score(r,q);if(s>bss){bss=s;b=r;}});
+    best=b;
+  }
+  return best.slice(0,400);
+}
 function route(q){for(var i=0;i<RULES.length;i++){var ks=RULES[i][1];for(var j=0;j<ks.length;j++){if(q.indexOf(ks[j])>=0)return RULES[i][0];}}return 'boss';}
 function pick(q){for(var i=0;i<CASES.length;i++){var ok=true,ks=CASES[i].kw;for(var j=0;j<ks.length;j++){if(q.indexOf(ks[j])<0){ok=false;break;}}if(ok)return CASES[i];}return null;}
 function kbAnswer(q,ag){var hits=retrieve(q,2);if(!hits.length)return null;var lines=hits.map(function(h){return excerpt(h[1],q);});lines.push('以上摘自知识库原文；标 🔴 的条目一律答「需工艺/财务确认」，不补数。');return {agent:ag,head:'以下摘自知识库原文，报价要工厂核。',lines:lines,srcs:hits.map(function(h){return '知识库 '+h[0].split(' ')[0];})};}
