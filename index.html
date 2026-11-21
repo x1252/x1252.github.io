@@ -48,7 +48,7 @@ button:hover{background:#0b4ea2}
 <div class='brand'>
 <h1>钛螺丝智能体矩阵</h1>
 <span>四人分工 · 每条结论可追溯出处</span>
-<span class='badge'>知识库检索模式</span>
+<span class='badge' id='badge'>加载知识库…</span>
 </div>
 <div class='route'>
 <span>需求 →</span>
@@ -62,7 +62,7 @@ button:hover{background:#0b4ea2}
 </header>
 <main>
 <div class='hint'>
-<b>试试这些：</b>下面每条都跑过真实验证。矩阵先判断该谁答，再按各自口径作答；涉及价格的只说「需核价」，涉及工艺参数的只说「需工艺确认」。
+<b>试试这些：</b>上面几条都跑过真实验证，也可以直接问别的——矩阵会到知识库里检索原句。涉及价格的只说「需核价」，工艺参数只说「需工艺确认」。
 <div class='chips' id='chips'></div>
 </div>
 <div id='chat'></div>
@@ -137,18 +137,25 @@ var CASES=[
 '**平台**：1688、慧聪、中国供应商、重庆摩博会与上海改装展名录、企查查按行业筛；海外 Alibaba、Made-in-China、ThomasNet。',
 '**需要你确认**：目标客户类型和区域，我按这个出结构化线索表。'],srcs:['检索策略（本次未联网，无真实线索）']}
 ];
+var SECTIONS=[];
+function splitSections(t){var out=[],title=null,buf=[];t.split(/\r?\n/).forEach(function(line){if(line.indexOf('## ')===0){if(title)out.push([title,buf.join('\n').trim()]);title=line.slice(3).trim();buf=[];}else if(title!==null){buf.push(line);}});if(title)out.push([title,buf.join('\n').trim()]);return out;}
+function score(text,q){var words=q.split(/[\s，。、；：？！,.;:?!()（）「」【】]+/).filter(function(w){return w.length>=2;});var grams={};words.forEach(function(w){for(var i=0;i<w.length-1;i++)grams[w.slice(i,i+2)]=1;});var s=0;words.forEach(function(w){if(text.indexOf(w)>=0)s+=6;});for(var g in grams){if(text.indexOf(g)>=0)s+=1;}return s;}
+function retrieve(q,k){k=k||2;var scored=SECTIONS.map(function(p){return [p[0],p[1],score(p[0]+'\n'+p[1],q)];}).filter(function(x){return x[2]>0;});scored.sort(function(a,b){return b[2]-a[2];});return scored.slice(0,k).map(function(x){return [x[0],x[1]];});}
+function excerpt(body,q){var chunks=body.split(/\n(?=[|\-\d#])/).map(function(c){return c.trim();}).filter(Boolean);if(!chunks.length)return body.slice(0,320);var best=chunks[0],bs=-1;chunks.forEach(function(c){var s=score(c,q);if(s>bs){bs=s;best=c;}});return best.slice(0,320);}
 function route(q){for(var i=0;i<RULES.length;i++){var ks=RULES[i][1];for(var j=0;j<ks.length;j++){if(q.indexOf(ks[j])>=0)return RULES[i][0];}}return 'boss';}
 function pick(q){for(var i=0;i<CASES.length;i++){var ok=true,ks=CASES[i].kw;for(var j=0;j<ks.length;j++){if(q.indexOf(ks[j])<0){ok=false;break;}}if(ok)return CASES[i];}return null;}
-var FALLBACK={agent:'boss',head:'这条我不敢直接答。',lines:['知识库里没有对应条目，我不猜也不编数字。','**建议**：把具体规格、用途、或客户原话补充给我，我判断该派给线索Bot、方案Bot 还是沟通Bot；属实拿不准的，转人工。'],srcs:['知识库（未命中）']};
-var chat=document.getElementById('chat'),input=document.getElementById('q'),btn=document.getElementById('send');
+function kbAnswer(q,ag){var hits=retrieve(q,2);if(!hits.length)return null;var lines=hits.map(function(h){return excerpt(h[1],q);});lines.push('以上摘自知识库原文；标 🔴 的条目一律答「需工艺/财务确认」，不补数。');return {agent:ag,head:'以下摘自知识库原文，报价要工厂核。',lines:lines,srcs:hits.map(function(h){return '知识库 '+h[0].split(' ')[0];})};}
+function buildAnswer(q){var ag=route(q);var c=pick(q);if(c)return c;var kb=kbAnswer(q,ag);if(kb)return kb;if(ag==='lead'){return {agent:'lead',head:'这轮没联网，给不了真实线索。',lines:['空口编公司名和电话是不行的，所以这条只给可执行的检索方案。','**需要你确认**：目标客户类型和区域，我按这个出结构化线索表。'],srcs:['检索策略（本次未联网，无真实线索）']};}return {agent:'boss',head:'这条我不敢直接答。',lines:['知识库里没有对应条目，我不猜也不编数字。','**建议**：把具体规格、用途、或客户原话补充给我，我判断该派给线索Bot、方案Bot 还是沟通Bot；属实拿不准的，转人工。'],srcs:['知识库（未命中）']};}
+var chat=document.getElementById('chat'),input=document.getElementById('q'),btn=document.getElementById('send'),badge=document.getElementById('badge');
 var PRESETS=['M8×30 TC4 内六角，蓝色阳极氧化，2000 件，摩托车刹车卡钳，报个价','钛螺丝颜色会掉吗','你们能保证永不生锈吗','客户嫌贵，怎么回','蓝色对应什么电压','帮我找一批重庆的摩托车改装厂线索'];
 PRESETS.forEach(function(t){var c=document.createElement('span');c.className='chip';c.textContent=t;c.onclick=function(){input.value=t;ask();};document.getElementById('chips').appendChild(c);});
 function esc(s){return s.replace(/</g,'&lt;');}
 function addMsg(who,role,color,html,srcs){var w=document.createElement('div');w.className='msg'+(who==='你'?' user':'');var a=document.createElement('div');a.className='avatar';a.style.background=color;a.textContent=who==='你'?'你':who.replace('Bot','').slice(0,2);var b=document.createElement('div');b.className='bubble';b.innerHTML='<div class=who>'+who+'<small>'+role+'</small></div>'+html;if(srcs&&srcs.length){var s=document.createElement('div');s.className='srcs';srcs.forEach(function(x){var e=document.createElement('span');e.className='src';e.textContent='依据 · '+x;s.appendChild(e);});b.appendChild(s);}w.appendChild(a);w.appendChild(b);chat.appendChild(w);window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});}
 function setRoute(k){var ns=document.querySelectorAll('.node');for(var i=0;i<ns.length;i++){ns[i].className='node'+(ns[i].getAttribute('data-k')===k?' on':'');}}
-function ask(){var q=input.value.trim();if(!q)return;addMsg('你','','#68757f','<p>'+esc(q)+'</p>');input.value='';var t=document.createElement('div');t.className='msg';t.innerHTML='<div class=avatar style=background:#c3ccd6>…</div><div class=bubble><div class=typing>判断该谁处理…</div></div>';chat.appendChild(t);setTimeout(function(){var d=pick(q)||FALLBACK;var ag=route(q);var name=NAMES[ag]||NAMES.boss;t.remove();setRoute(ag);var html=d.head?'<p><strong>'+d.head+'</strong></p>':'';html+=d.lines.map(function(l){return esc(l).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').split('\n').map(function(p){return '<p>'+p+'</p>';}).join('');}).join('');addMsg(name[0],name[1],COLORS[ag]||'#1f6feb',html,d.srcs);input.focus();},260);}
+function ask(){var q=input.value.trim();if(!q)return;addMsg('你','','#68757f','<p>'+esc(q)+'</p>');input.value='';var t=document.createElement('div');t.className='msg';t.innerHTML='<div class=avatar style=background:#c3ccd6>…</div><div class=bubble><div class=typing>判断该谁处理…</div></div>';chat.appendChild(t);setTimeout(function(){var d=buildAnswer(q);var ag=route(q);var name=NAMES[ag]||NAMES.boss;t.remove();setRoute(ag);var html=d.head?'<p><strong>'+d.head+'</strong></p>':'';html+=d.lines.map(function(l){return esc(l).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').split('\n').map(function(p){return '<p>'+p+'</p>';}).join('');}).join('');addMsg(name[0],name[1],COLORS[ag]||'#1f6feb',html,d.srcs);input.focus();},260);}
 btn.onclick=ask;input.addEventListener('keydown',function(e){if(e.key==='Enter')ask();});
 addMsg('Boss','总调度',COLORS.boss,'<p>我是这套矩阵的总调度。需求进来我先判断该谁处理：</p><p>· 要客户名单 → 线索Bot<br>· 给规格问能不能做、多少钱 → 方案Bot<br>· 要回客户的话 → 沟通Bot<br>· 只问原理 → 我自己用知识库答</p><p>定下规矩：<strong>不编数字、不编公司名、不做绝对承诺。</strong>知识库里标红的条目，一律答「需工艺/财务确认」。</p>',['知识库 §八 合规红线']);
+fetch('kb.md').then(function(r){if(!r.ok)throw new Error('404');return r.text();}).then(function(txt){SECTIONS=splitSections(txt);badge.textContent='知识库全文已载入 · '+SECTIONS.length+' 段';badge.title='可在任意问题中检索知识库原文';}).catch(function(){badge.textContent='场景库模式';badge.title='未找到 kb.md，仅预置场景可答';});
 </script>
 </body>
 </html>
