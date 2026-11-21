@@ -97,7 +97,7 @@ var CASES=[
 '装饰件或耐蚀场景走 TA2，承力件走 TC4。**需要你确认**：用途是装饰还是承力。'],srcs:['知识库 §一']},
 {kw:['嫌贵'],agent:'comm',head:'不降价，把账算到客户那边去。',lines:[
 '**微信版**：理解，钛螺丝单价确实比钢的高，这个不瞒您。贵在三处：钛材本身贵，加工慢、工时高，还多一道阳极氧化。不过它省的钱不在单价上——颜色是阳极氧化长出来的膜，不是喷漆，可以按规格和用途做颜色区分，新人看颜色就知道装哪，不用老师傅盯着。想问您一句，你们车间这一年因为装错返工、生锈换货大概花过多少？',
-'**邮件版**：标题「关于钛螺丝价格，算一笔综合成本账」，把防错装、减重、防腐三条分开写，结尾请对方提供常用规格与安装部位，我们做一份对比测算。',
+'**邮件版**：标题「关于钛螺丝价格，算一笔综合成本账」，把防错装、减重、耐蚀三条分开写，结尾请对方提供常用规格与安装部位，我们做一份对比测算。',
 '**电话版（30 秒开口）**：「×总，价格我这边不能随口改。您报两三个常用规格，我请工厂核价后回复您。账期我们也不在这里口头定，按公司统一政策来。」',
 '**三个可能的问题**：①能不能便宜点 → 报规格数量，核价后回复，不口头让价；②我现在用的钢也能用 → 问三句：装错过吗、生锈换过货吗、新人要带多久；③能管多少年不锈 → 具体年限要看本厂实测数据，请工程书面回复，不打包票。'],srcs:['知识库 §一','知识库 §2.1','知识库 §九','知识库 §八']},
 {kw:['邮件'],agent:'comm',head:'模板给你，编号的地方我不替你填。',lines:[
@@ -124,10 +124,10 @@ var CASES=[
 '颜色是阳极氧化时膜厚产生的干涉色，不是喷涂上去的颜料层——它长在金属表面里，不会整片脱落。',
 '但要说清楚：颜色可能因膜厚波动有轻微色差，深色件长期强光下会缓慢变化，这是物理现象不是质量缺陷。',
 '**需要你确认**：用在室内还是户外、是否长期强光暴露。'],srcs:['知识库 §2.1']},
-{kw:['电压'],agent:'boss',head:'蓝色对应的电压，本厂要查工艺卡。',lines:[
-'颜色由阳极氧化电压决定，不同电压出不同颜色的干涉色。',
-'知识库里的 18～25 V 是**参考区间**，只能内部参考，不能当本厂工艺参数对客户报出去。',
-'**需要确认**：本厂蓝色对应电压，需工艺确认。'],srcs:['知识库 §2.2']},
+{kw:['电压'],agent:'boss',head:'颜色对应多少伏，这条要工艺确认。',lines:[
+'颜色由阳极氧化电压决定，不同电压出不同颜色的干涉色——电压升高、膜层增厚，颜色往蓝、绿、紫、粉灰方向推移。',
+'但**具体电压数值属本厂工艺数据，标红待确认，这里不给出数字**，也不对客户承诺。',
+'**需要确认**：本厂各颜色对应的电压区间与色板编号，需工艺确认。'],srcs:['知识库 §2.2']},
 {kw:['多少钱'],agent:'solution',head:'这个信息还不够，我先问一句再往下走。',lines:[
 '需要两个信息：规格（比如 M6×20、M8×30）和用途场景（刹车、悬挂、装饰，还是机箱结构件）。',
 '另外请给数量。这三样齐了，我出选型建议和参考价区间，价格以工厂核价为准。'],srcs:['知识库 §五']},
@@ -141,11 +141,15 @@ var SECTIONS=[];
 function splitSections(t){var out=[],title=null,buf=[];t.split(/\r?\n/).forEach(function(line){if(line.indexOf('## ')===0){if(title)out.push([title,buf.join('\n').trim()]);title=line.slice(3).trim();buf=[];}else if(title!==null){buf.push(line);}});if(title)out.push([title,buf.join('\n').trim()]);return out;}
 function score(text,q){var words=q.split(/[\s，。、；：？！,.;:?!()（）「」【】]+/).filter(function(w){return w.length>=2;});var grams={};words.forEach(function(w){for(var i=0;i<w.length-1;i++)grams[w.slice(i,i+2)]=1;});var s=0;words.forEach(function(w){if(text.indexOf(w)>=0)s+=6;});for(var g in grams){if(text.indexOf(g)>=0)s+=1;}return s;}
 function retrieve(q,k){k=k||2;var scored=SECTIONS.map(function(p){return [p[0],p[1],score(p[0]+'\n'+p[1],q)];}).filter(function(x){return x[2]>0;});scored.sort(function(a,b){return b[2]-a[2];});return scored.slice(0,k).map(function(x){return [x[0],x[1]];});}
+var BANNED=['免维护','长期不锈','永不生锈','绝对不生锈'];
+function isBanned(p){for(var i=0;i<BANNED.length;i++){if(p.indexOf(BANNED[i])>=0)return true;}return false;}
 function excerpt(body,q){
   var paras=body.split(/\n\s*\n/).map(function(c){return c.trim();}).filter(Boolean);
   if(!paras.length)return body.slice(0,400);
-  var best=paras[0],bs=-1;
-  paras.forEach(function(p){var s=score(p,q);if(s>bs){bs=s;best=p;}});
+  var cands=paras.filter(function(p){return !isBanned(p);});
+  if(!cands.length)cands=paras;
+  var best=cands[0],bs=-1;
+  cands.forEach(function(p){var s=score(p,q);if(s>bs){bs=s;best=p;}});
   if(best.charAt(0)==='|'){
     var rows=best.split('\n').filter(function(r){return r.trim().charAt(0)==='|';});
     var b=rows[0],bss=-1;
